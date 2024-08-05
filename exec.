@@ -1,0 +1,63 @@
+local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Holding = false
+
+_G.AimbotEnabled = true
+_G.TeamCheck = true -- Set to true so the script only locks your aim at enemy team members.
+_G.AimPart = "HumanoidRootPart" -- Set the aim part to HumanoidRootPart.
+_G.SmoothingFactor = 0.1 -- A lower value means smoother but slower transitions.
+
+local function GetClosestPlayer()
+    local MaximumDistance = math.huge
+    local Target = nil
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character then
+            local HumanoidRootPart = v.Character:FindFirstChild("HumanoidRootPart")
+            local Humanoid = v.Character:FindFirstChild("Humanoid")
+            if HumanoidRootPart and Humanoid and Humanoid.Health > 0 then
+                if not _G.TeamCheck or (v.Team ~= LocalPlayer.Team) then
+                    local ScreenPoint = Camera:WorldToScreenPoint(HumanoidRootPart.Position)
+                    local MouseLocation = UserInputService:GetMouseLocation()
+                    local VectorDistance = (Vector2.new(MouseLocation.X, MouseLocation.Y) - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
+
+                    if VectorDistance < MaximumDistance then
+                        Target = v
+                        MaximumDistance = VectorDistance
+                    end
+                end
+            end
+        end
+    end
+
+    return Target
+end
+
+UserInputService.InputBegan:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.MouseButton2 then
+        Holding = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.MouseButton2 then
+        Holding = false
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if Holding and _G.AimbotEnabled then
+        local Target = GetClosestPlayer()
+        if Target and Target.Character and Target.Character:FindFirstChild(_G.AimPart) then
+            local AimPart = Target.Character[_G.AimPart]
+            local CurrentCFrame = Camera.CFrame
+            local TargetPosition = AimPart.Position
+            local Direction = (TargetPosition - Camera.CFrame.Position).unit
+            local TargetCFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + Direction)
+            Camera.CFrame = CurrentCFrame:Lerp(TargetCFrame, _G.SmoothingFactor)
+        end
+    end
+end)
